@@ -15,6 +15,13 @@
 
 int hiscount=0;
 
+//重定向输入函数
+//重定向输出覆盖函数
+//重定向输出追加函数
+//管道函数
+//后台函数
+//搜索命令函数
+void exe_com(char *args[],int argcount);
 void change_dir(char *args[],char *hispath[]);
 int main()
 {
@@ -29,14 +36,18 @@ int main()
     {
         args[i]=(char *)malloc(sizeof(char)*ARG_MAX);
     }
-    char *input=(char *)malloc(sizeof(char)*INPUT_MAX);
+    char *input=NULL;
     while(1)
     {
         getcwd(cwdpath,PATHNAME_MAX);
         strcpy(hispath[hiscount++],cwdpath);
-        printf("%s\n",hispath[0]);
         printf("\033[1;34m%s\033[0m\n",cwdpath);
-        input = readline("$ ");
+        if(input!= NULL)
+        {
+            free(input);
+            input=NULL;
+        }
+        input=readline("$ ");
         if(input!=NULL) 
         {
             add_history(input);
@@ -57,6 +68,7 @@ int main()
         {
             break;
         }
+        exe_com(args,argcount);
     }
     free(cwdpath);
     for(int i=0;i<HISTORY_MAX;i++)
@@ -89,5 +101,39 @@ void change_dir(char *args[],char *hispath[])
     else
     {
         chdir(args[1]);
+    }
+}
+void exe_com(char *args[],int argcount)
+{
+    int record=0;
+    for(int i=0;i<argcount;i++)
+    {
+        if(strcmp(args[i],"<")==0)
+        {
+            record=i;
+        }
+    }
+    if(record!=0)
+    {
+        //重定向输入函数
+    }
+    for(int i=0;i<argcount;i++)
+    {
+        if(strcmp(args[i],">")==0)
+        {
+            //重定向输出函数
+        }
+        if(strcmp(args[i],">>")==0)
+        {
+            //重定向输出函数
+        }
+        if(strcmp(args[i],"|")==0)
+        {
+            //管道函数
+        }
+        if(strcmp(args[i],"&")==0)
+        {
+            //后台函数
+        }
     }
 }
