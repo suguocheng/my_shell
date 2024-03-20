@@ -6,6 +6,8 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 
 #define HISTORY_MAX   100
 #define PATHNAME_MAX  200
@@ -21,6 +23,7 @@ int hiscount=0;
 //管道函数
 //后台函数
 //搜索命令函数
+void exe(char *args[],int p);
 void exe_com(char *args[],int argcount);
 void change_dir(char *args[],char *hispath[]);
 int main()
@@ -105,35 +108,85 @@ void change_dir(char *args[],char *hispath[])
 }
 void exe_com(char *args[],int argcount)
 {
-    int record=0;
-    for(int i=0;i<argcount;i++)
+    pid_t pid=fork();
+    if(pid==0)
     {
-        if(strcmp(args[i],"<")==0)
+        int fd;
+        for(int i=0;i<argcount;i++)
         {
-            record=i;
+            if(strcmp(args[i],"&")==0)
+            {
+                
+            }
+        }
+        for(int i=0;i<argcount;i++)
+        {
+            if(strcmp(args[i],"<")==0)
+            {
+                fd=open(args[i+1],O_RDONLY);
+                dup2(fd,STDIN_FILENO);
+                close(fd);
+            }
+            if(strcmp(args[i],">")==0)
+            {
+                fd=open(args[i+1],O_WRONLY|O_CREAT|O_TRUNC,0644);
+                dup2(fd,STDOUT_FILENO);
+                close(fd);
+            }
+            if(strcmp(args[i],">>")==0)
+            {
+                fd=open(args[i+1],O_WRONLY|O_CREAT|O_APPEND,0644);
+                dup2(fd,STDOUT_FILENO);
+                close(fd);
+            }
+            if(strcmp(args[i],"|")==0)
+            {
+                int fd[2];
+                if(pipe(fd)==-1)
+                {
+                    printf("pipe error");
+                }
+                pid_t pid2=fork();
+                if(pid2==0)
+                {
+                    close(fd[0]);
+                    dup2(fd[1],STDOUT_FILENO);
+                }
+                else if(pid2>0)
+                {
+                    waitpid(pid2,NULL,0);
+                    close(fd[1]);
+                    dup2(fd[0],STDIN_FILENO); 
+                }
+                else
+                {
+                    printf("fork error");
+                }
+            }
         }
     }
-    if(record!=0)
+    else if(pid>0)
     {
-        //重定向输入函数
+        waitpid(pid,NULL,0);
     }
-    for(int i=0;i<argcount;i++)
+    else
     {
-        if(strcmp(args[i],">")==0)
-        {
-            //重定向输出函数
-        }
-        if(strcmp(args[i],">>")==0)
-        {
-            //重定向输出函数
-        }
-        if(strcmp(args[i],"|")==0)
-        {
-            //管道函数
-        }
-        if(strcmp(args[i],"&")==0)
-        {
-            //后台函数
-        }
+        printf("fork error");
+    }
+}
+void exe(char *commands[],int p)
+{
+    pid_t pid=fork();
+    if(pid==0)
+    {
+        execvp(commands[0],commands);
+    }
+    else if(pid>0)
+    {
+        waitpid(pid,NULL,0);
+    }
+    else
+    {
+        printf("fork error");
     }
 }
