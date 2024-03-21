@@ -23,11 +23,21 @@ int hiscount=0;
 //管道函数
 //后台函数
 //搜索命令函数
-void exe(char *args[],int p);
+void exe(char *args[]);
 void exe_com(char *args[],int argcount);
 void change_dir(char *args[],char *hispath[]);
 int main()
 {
+    puts(
+        "\033[32m" "\033[1m" "\n"
+        " _       __     __                            __                          _____ __         ____\n"
+        "| |     / /__  / /________  ____ ___  ___    / /_____    ____ ___  __ __ / ___// /_  ___  / / /\n"
+        "| | /| / / _ \\/ / ___/ __ \\/ __ `__ \\/ _ \\  / __/ __ \\  / __ `__ \\/ / / /\\__ \\/ __ \\/ _ \\/ / / \n"
+        "| |/ |/ /  __/ / /__/ /_/ / / / / / /  __/ / /_/ /_/ / / / / / / / /_/ /___/ / / / /  __/ / / \n"
+        "|__/|__/\\___/_/\\___/\\____/_/ /_/ /_/\\___/  \\__/\\____/ /_/ /_/ /_/\\__, //____/_/ /_/\\___/_/_/ \n"
+        "                                                                /____/ \n"
+        "\033[0m"
+    );
     char *cwdpath=(char *)malloc(sizeof(char)*PATHNAME_MAX);
     char **hispath=(char **)malloc(sizeof(char*)*HISTORY_MAX);
     for(int i=0;i<HISTORY_MAX;i++)
@@ -109,6 +119,15 @@ void change_dir(char *args[],char *hispath[])
 void exe_com(char *args[],int argcount)
 {
     pid_t pid=fork();
+    char ***commands=(char ***)malloc(sizeof(char **)*ARG_MAX);
+    for(int i=0;i<ARG_MAX;i++)
+    {
+        commands[i]=(char **)malloc(sizeof(char *)*ARG_MAX);
+        for(int j=0;j<ARG_MAX;j++)
+        {
+            commands[i][j]=(char *)malloc(sizeof(char)*ARG_MAX);
+        }
+    }
     if(pid==0)
     {
         int fd;
@@ -119,51 +138,92 @@ void exe_com(char *args[],int argcount)
                 
             }
         }
-        for(int i=0;i<argcount;i++)
+        int record=0;
+        int a=0;
+        int b;
+        int count;
+        int i;
+        for(i=0;i<argcount;i++)
         {
+            count=0;
             if(strcmp(args[i],"<")==0)
             {
-                fd=open(args[i+1],O_RDONLY);
-                dup2(fd,STDIN_FILENO);
-                close(fd);
+                // fd=open(args[i+1],O_RDONLY);
+                // dup2(fd,STDIN_FILENO);
+                // close(fd);
+                count=1;
             }
             if(strcmp(args[i],">")==0)
             {
-                fd=open(args[i+1],O_WRONLY|O_CREAT|O_TRUNC,0644);
-                dup2(fd,STDOUT_FILENO);
-                close(fd);
+                // fd=open(args[i+1],O_WRONLY|O_CREAT|O_TRUNC,0644);
+                // dup2(fd,STDOUT_FILENO);
+                // close(fd);
+                count=1;
             }
             if(strcmp(args[i],">>")==0)
             {
-                fd=open(args[i+1],O_WRONLY|O_CREAT|O_APPEND,0644);
-                dup2(fd,STDOUT_FILENO);
-                close(fd);
+                // fd=open(args[i+1],O_WRONLY|O_CREAT|O_APPEND,0644);
+                // dup2(fd,STDOUT_FILENO);
+                // close(fd);
+                count=1;
             }
             if(strcmp(args[i],"|")==0)
             {
-                int fd[2];
-                if(pipe(fd)==-1)
+                // int fd[2];
+                // if(pipe(fd)==-1)
+                // {
+                //     printf("pipe error");
+                // }
+                // pid_t pid2=fork();
+                // if(pid2==0)
+                // {
+                //     close(fd[0]);
+                //     dup2(fd[1],STDOUT_FILENO);
+                // }
+                // else if(pid2>0)
+                // {
+                //     waitpid(pid2,NULL,0);
+                //     close(fd[1]);
+                //     dup2(fd[0],STDIN_FILENO); 
+                // }
+                // else
+                // {
+                //     printf("fork error");
+                // }
+                count=1;
+            }
+            if(count==1)
+            {
+                b=0;
+                for(int j=record;j<i;j++)
                 {
-                    printf("pipe error");
+                    strcpy(commands[a][b],args[j]);
+                    b++;
                 }
-                pid_t pid2=fork();
-                if(pid2==0)
-                {
-                    close(fd[0]);
-                    dup2(fd[1],STDOUT_FILENO);
-                }
-                else if(pid2>0)
-                {
-                    waitpid(pid2,NULL,0);
-                    close(fd[1]);
-                    dup2(fd[0],STDIN_FILENO); 
-                }
-                else
-                {
-                    printf("fork error");
-                }
+                a++;
+                record=i+1;
             }
         }
+        b=0;
+        for(int j=record;j<i;j++)
+        {
+            strcpy(commands[a][b],args[j]);
+            b++;
+        }
+        a++;
+        for(int i=0;i<a;i++)
+        {
+            execvp(commands[i][0],commands[i]);
+            //没反应啊
+        }
+        // 输出调试
+        // for(int i=0;i<a;i++)
+        // {
+        //     for(int j=0;j<b;j++)
+        //     {
+        //         printf("%s\n",commands[i][j]);
+        //     }
+        // }
     }
     else if(pid>0)
     {
@@ -174,7 +234,7 @@ void exe_com(char *args[],int argcount)
         printf("fork error");
     }
 }
-void exe(char *commands[],int p)
+void exe(char *commands[])
 {
     pid_t pid=fork();
     if(pid==0)
