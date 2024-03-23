@@ -60,7 +60,7 @@ int main()
             free(input);
             input=NULL;
         }
-        input=readline("$ ");
+        input=readline("");
         if(input!=NULL) 
         {
             add_history(input);
@@ -72,7 +72,6 @@ int main()
             args[argcount++]=temp;
             temp=strtok(NULL," ");
         }
-        args[argcount]= NULL;
         if(strcmp(args[0],"cd")==0)
         {
             change_dir(args,hispath);
@@ -120,12 +119,23 @@ void change_dir(char *args[],char *hispath[])
 }
 void exe_com(char *args[], int argcount)
 {
+    int is_background = 0;
     pid_t pid;
     pid = fork();
     if (pid == 0)
     {
         int fd;
+        int i;
         for (int i = 0; i < argcount; i++)
+        {
+            if (strcmp(args[i], "&") == 0)
+            {
+                is_background = 1;
+                args[i] = NULL;
+                break;
+            }
+        }
+        for (i = 0; i < argcount; i++)
         {
             if (strcmp(args[i], "<") == 0)
             {
@@ -175,14 +185,36 @@ void exe_com(char *args[], int argcount)
                     close(fd[0]);
                     break;
                 }
+                break;
             }
         }
-        // for(int i=0;i<argcount;i++)
-        // {
-        //     printf("%s\n",args[i]);
-        // }
-        execvp(args[0], args);
-        perror("execvp");
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+            char *commands[ARGC_MAX];
+            int record=0;
+            for (int j = record; j < i; j++)
+            {
+                commands[j] = args[j];
+                printf("%s\n",commands[j]);
+            }
+            commands[i] = NULL;
+            // execvp(commands[record], commands + record);
+            record=i+1;
+            perror("execvp");
+            exit(EXIT_FAILURE);
+        }
+        else if (pid > 0)
+        {
+            if (is_background == 0)
+            {
+                waitpid(pid, NULL, 0);
+            }
+        }
+        else
+        {
+            printf("fork error");
+        }
     }
     else if (pid > 0)
     {
