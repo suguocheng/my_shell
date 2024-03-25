@@ -8,6 +8,7 @@
 #include <readline/history.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #define HISTORY_MAX   100
 #define PATHNAME_MAX  200
@@ -17,13 +18,6 @@
 
 int hiscount=0;
 
-//重定向输入函数
-//重定向输出覆盖函数
-//重定向输出追加函数
-//管道函数
-//后台函数
-//搜索命令函数
-// void exe(char *args[]);
 void exe_com(char *args[],int argcount);
 void change_dir(char *args[],char *hispath[]);
 int main()
@@ -50,6 +44,9 @@ int main()
         args[i]=(char *)malloc(sizeof(char)*ARG_MAX);
     }
     char *input=NULL;
+
+    signal(SIGINT, SIG_IGN);
+
     while(1)
     {
         getcwd(cwdpath,PATHNAME_MAX);
@@ -60,7 +57,7 @@ int main()
             free(input);
             input=NULL;
         }
-        input=readline("");
+        input=readline("$ ");
         if(input!=NULL) 
         {
             add_history(input);
@@ -84,7 +81,7 @@ int main()
         //debug
         // for(int i=0;i<argcount;i++)
         // {
-        //     printf("%s\n",args[i]);
+        //     printf("args[%d]=%s\n",i,args[i]);
         // }
 
         pid_t pid;
@@ -139,95 +136,148 @@ void change_dir(char *args[],char *hispath[])
 }
 void exe_com(char *args[], int argcount)
 {
-    int is_background = 0;
-    int fd;
-    int pfd[2];
-    int i;
+    int is_background=0;
     int pipepos=-1;
-    for (int i = 0; i < argcount; i++)
+    
+    //debug
+    // printf("pipepos=%d\n",pipepos);
+
+    int i=0;
+    int pfd[2];
+    for(int a=0;a<argcount;a++)
     {
-        if (strcmp(args[i], "&") == 0)
+        if (args[a]!=NULL&&strcmp(args[a],"|")==0)
         {
-            is_background = 1;
-            args[i] = NULL;
-            break;
-        }
-    }
-    for (i = 0; i < argcount; i++)
-    {
-        if (strcmp(args[i], "<") == 0)
-        {
-            fd = open(args[i + 1], O_RDONLY);
-            dup2(fd, STDIN_FILENO);
-            close(fd);
-            args[i] = NULL;
-            // args[i+1] = NULL;
-        }
-        else if (strcmp(args[i], ">") == 0)
-        {
-            fd = open(args[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-            args[i] = NULL;
-            // args[i+1] = NULL;
-        }
-        else if (strcmp(args[i], ">>") == 0)
-        {
-            fd = open(args[i + 1], O_WRONLY | O_CREAT | O_APPEND, 0644);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-            args[i] = NULL;
-            // args[i+1] = NULL;
-        }
-        else if (strcmp(args[i], "|") == 0)
-        {
-            if (pipe(pfd) == -1)
+            if(pipe(pfd)==-1)
             {
                 printf("pipe error");
             }
-            close(pfd[0]);
-            dup2(pfd[1], STDOUT_FILENO);
-            close(pfd[1]);
-            pipepos=i;
+            pipepos=a;
             break;
         }
     }
-    pid_t pid = fork();
+    pid_t pid;
+    pid = fork();
     if (pid == 0)
     {
+        if (is_background!=0)
+        {
+            close(STDIN_FILENO);
+            close(STDOUT_FILENO);
+            close(STDERR_FILENO);
+            setsid();
+        }
+        int fd;
+        for(int a=0;a<argcount;a++)
+        {
+            if(args[i]!=NULL&&strcmp(args[a],"&")==0)
+            {
+                is_background=1;
+                args[a]=NULL;
+                break;
+            }
+        }
+        for(i=0;i<argcount;i++)
+        {
+            if(args[i]!=NULL&&strcmp(args[i],"<")==0)
+            {
+                fd=open(args[i+1],O_RDONLY);
+                dup2(fd,STDIN_FILENO);
+                close(fd);
+                args[i]=NULL;
+                args[i+1]=NULL;
+            }
+            else if(args[i]!=NULL&&strcmp(args[i],">")==0)
+            {
+                fd=open(args[i+1],O_WRONLY|O_CREAT|O_TRUNC,0644);
+                dup2(fd,STDOUT_FILENO);
+                close(fd);
+                args[i]=NULL;
+                args[i+1]=NULL;
+            }
+            else if(args[i]!=NULL&&strcmp(args[i],">>")==0)
+            {
+                fd=open(args[i+1],O_WRONLY|O_CREAT|O_APPEND,0644);
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                args[i]=NULL;
+                args[i+1]=NULL;
+            }
+            else if(args[i]!=NULL&&strcmp(args[i],"|")==0)
+            {
+                close(pfd[0]);
+                dup2(pfd[1],STDOUT_FILENO);
+                close(pfd[1]);
+                break;
+            }
+        }
+
+        //debug
+        // printf("pipepos=%d\n",pipepos);
+        // printf("i=%d\n",i);
+        //debug
+        // for(int b=0;b<argcount;b++)
+        // {
+        //     if(args[b]!=NULL)
+        //     printf("arg[%d]=%s\n",b,args[b]);
+        // }
+
+        char *commands[ARGC_MAX];
+
+        //malloc
+        // for(int a=0;a<ARGC_MAX;a++)
+        // {
+        //     commands[a]=(char*)malloc(sizeof(char)*ARG_MAX);
+        // }
+
+        int k=0;
+        for(int j=0;j<i;j++)
+        {
+            if(args[j]!=NULL)
+            {
+                // strcpy(commands[k],args[j]);
+                commands[k]=args[j];
+                k++;
+            }
+        }
+
+        //debug
+        // printf("k=%d\n",k);
+
+        commands[k]=NULL;
+
+        //debug
+        // for(int c=0;c<k;c++)
+        // {
+        //     if(commands[c]!=NULL)
+        //     printf("commands[%d]=%s\n",c,commands[c]);
+        // }
+
+        execvp(commands[0],commands);
+        perror("execvp");
+        exit(1);
+    }
+    else if(pid>0)
+    {
+        if(is_background==0)
+        {
+            waitpid(pid,NULL,0);
+        }
+        
         if(pipepos>0)
         {
-            close(pfd[1]);
-            dup2(pfd[0], STDIN_FILENO);
-            close(pfd[0]);
+
+            //debug
+            // printf("递归pipepos=%d\n",pipepos);
+
+            exe_com(args+pipepos+1,argcount-pipepos-1);
         }
-        char *commands[ARGC_MAX];
-        int k=0;
-        for (int j = 0; j < i; j++)
-        {
-            commands[k] = args[j];
-            k++;
-            // if(commands[k]!=NULL)
-            // printf("%s\n",commands[k]);//debug
-        }
-        commands[k] = NULL;
-        execvp(commands[0], commands);
-        exit(EXIT_FAILURE);
-    }
-    else if (pid > 0)
-    {
-        if (is_background == 0)
-        {
-            waitpid(pid, NULL, 0);
-        }
+        close(pfd[1]);
+        dup2(pfd[0],STDIN_FILENO);
+        close(pfd[0]);
     }
     else
     {
         printf("fork error");
-    }
-    //递归
-    if(pipepos>0)
-    {
-        exe_com(args+i+1, argcount-i-1);
     }
 }
